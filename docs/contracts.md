@@ -2,7 +2,7 @@
 
 Этот файл — единственное, что нужно знать сервису о соседях.
 
-`auth_serv` — Python (FastAPI). `recp_serv` и `user_serv` — Java (Spring Boot).
+`auth_serv` и `user_serv` — Python (FastAPI). `recp_serv` — Java (Spring Boot).
 
 ## Сервисы и порты
 
@@ -12,7 +12,7 @@
 | recp_serv | 8002 | http://recp_serv:8000 | recp_db |
 | user_serv | 8003 | http://user_serv:8000 | user_db |
 
-Сервисы на Java внутри контейнера тоже слушают **8000**.
+Java-сервис внутри контейнера тоже слушает **8000**.
 
 Один контейнер Postgres, **у каждого сервиса своя БД**. В чужую БД не ходим, только через HTTP.
 Поэтому ссылки на чужие сущности (`user_id`, `doctor_id`) хранятся как обычный `bigint` **без FK**.
@@ -64,6 +64,7 @@ String role = c.get("role", String.class);
 | Кто вызывает | Кого | Зачем |
 |---|---|---|
 | auth_serv | `POST recp/internal/patients` `{user_id, first_name, last_name, email, phone}` | Создать пустую карту при регистрации. Идемпотентно по `user_id` |
+| user_serv | `GET recp/internal/patients/by-user/{user_id}` | Найти карту пациента по аккаунту (`id`, `is_verified`) для `/me/*` |
 | user_serv | `GET recp/internal/appointments/{id}` | Проверить, что запись этого врача и в статусе `SCHEDULED` |
 | user_serv | `POST recp/internal/appointments/{id}/complete` | Пометить запись `COMPLETED` при создании визита |
 | user_serv | `GET recp/internal/services/{id}` | Узнать цену услуги для `performed_services` |

@@ -23,9 +23,9 @@ services:
     ports: ["8001:8000"]
     depends_on: { db: { condition: service_healthy } }
 
-  # recp_serv и user_serv — Java (Spring Boot), пишет Лёша.
+  # recp_serv — Java (Spring Boot), пишет Лёша.
   # Внутри контейнера слушать порт 8000 (server.port=8000), Dockerfile в корне папки сервиса.
-  # Пока Java-сервисов нет, поднимать так:  docker compose up db auth_serv
+  # Пока Java-сервиса нет, поднимать так:  docker compose up db auth_serv user_serv
   recp_serv:
     build: ./services/recp_serv
     env_file: .env
@@ -40,9 +40,7 @@ services:
     build: ./services/user_serv
     env_file: .env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/user_db
-      SPRING_DATASOURCE_USERNAME: clinic
-      SPRING_DATASOURCE_PASSWORD: clinic
+      DATABASE_URL: postgresql+psycopg://clinic:clinic@db:5432/user_db
       RECP_URL: http://recp_serv:8000
     ports: ["8003:8000"]
     depends_on: { db: { condition: service_healthy } }

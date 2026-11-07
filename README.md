@@ -1,13 +1,13 @@
 # Стоматология — MVP
 
 Три сервиса: `auth_serv` (Python: аккаунты, JWT), `recp_serv` (Java: пациенты, расписание, записи),
-`user_serv` (Java: визиты, медкарта, аналитика). Контракты между ними — `docs/contracts.md`.
+`user_serv` (Python: визиты, медкарта, аналитика). Контракты между ними — `docs/contracts.md`.
 
 ## Запуск
 
 ```bash
 cp .env.example .env          # поменять секреты
-docker compose up --build db auth_serv   # пока Java-сервисов нет; потом просто docker compose up --build
+docker compose up --build db auth_serv user_serv   # пока recp (Java) нет; потом просто docker compose up --build
 docker compose exec auth_serv python -m scripts.seed   # админ, рецепция, 2 врача (пароль password123)
 ```
 

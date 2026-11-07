@@ -1,172 +1,130 @@
-# Разбивка задач по сервисам — клиника (MVP)
+# Кто что делает — MVP
 
-Три сервиса из схемы → три разработчика. Ниже: кто за что отвечает, какие таблицы и эндпоинты делает, что отдаёт другим и в каком порядке работать.
+Контракты между сервисами: `docs/contracts.md`. Схема БД (справочно): `docs/db_schema.md`.
 
-> Стек (предположение, замените при необходимости): Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, PostgreSQL, pytest. Для MVP рекомендуется **один репозиторий и одна БД, три модуля/роутера** (`auth`, `recp`, `user`), а не три отдельных деплоя — иначе вы утонете в межсервисных вызовах. Границы модулей при этом соблюдаются так же строго.
+| Кто | Что | Стек |
+|---|---|---|
+| **Лид** | фронт целиком, nginx, интеграция, демо | — |
+| **Лёша** | `recp_serv` — пациенты, услуги, врачи, расписание, записи | Java, Spring Boot |
+| **Дев 2** | `user_serv` — визиты, выполненные услуги, аллергии, выручка | Python, FastAPI |
+| **Даня** | доделки `auth_serv`, Postman-коллекция, демо-данные | Python |
 
-Структура репозитория:
+**Цель MVP — один сквозной сценарий, который работает на защите:**
+регистрация → пациент записывается онлайн (PENDING) → рецепция подтверждает → врач проводит визит и вносит выполненные услуги → админ видит выручку.
 
-```
-app/
-  core/          # config, db session, security (Dev A владеет)
-  auth/          # Dev A
-  recp/          # Dev B
-  user/          # Dev C
-  main.py
-alembic/
-tests/
-```
-
-## Кто за что отвечает
-
-| | Dev A | Dev B | Dev C |
-|---|---|---|---|
-| Сервис | `auth_serv` | `recp_serv` | `user_serv` |
-| Акторы | все (вход/регистрация) | recp, manager | patient, doctor, admin |
-| Таблицы | `users`, `doctor_profiles`, `services`, `doctor_services` | `patients`*, `appointments`, `appointment_requests` | `visits`, `performed_services`, `tooth_records`, `patient_allergies`, `patient_chronic_conditions` |
-
-\* `patients` создаётся при регистрации (Dev A вызывает функцию Dev B) — см. «Контракты».
-
-Отличия от схемы draw.io: каталог услуг (`services`, `doctor_services`) отдан Dev A, потому что у него самая лёгкая нагрузка; аналитика админа — в конце Dev C. «Visit» из схемы = `appointment` (запись) в нашей БД.
+Всё, что не помогает этому сценарию, — в самый конец или «в планах».
 
 ---
 
-## Dev A — `auth_serv` (аккаунты, доступ, каталог)
+## ✅ Уже готово
 
-Он же делает **фундамент**, без которого остальные не могут начать: в первый день нужен каркас проекта.
+- `auth_serv`: register / login / logout / me, JWT в cookie и Bearer, роли, миграция `users`, seed (админ, рецепция, 2 врача, пароль `password123`), тесты
+- `docker-compose.yml` (Postgres, отдельная БД на каждый сервис), `.env.example`, контракты
 
-### Фаза 0 — каркас (день 1, блокирует остальных)
-- [ ] Структура проекта, `core/config.py` (.env), подключение к БД, Alembic
-- [ ] Docker-compose: Postgres + приложение
-- [ ] Модель и миграция `users` (поля из `db_schema.md`)
-- [ ] Зависимости для всех: `get_current_user()` и `require_role(*roles)` — остальные вешают их на свои эндпоинты
-- [ ] Заглушка `get_current_user`, чтобы B и C могли работать до готового логина
+---
 
-### Фаза 1 — аутентификация
-- [ ] `POST /auth/register` — регистрация пациента: `email, first_name, last_name, pesel, phone, password`. Валидация (email, PESEL 11 цифр, пароль). Хеш пароля (argon2/bcrypt). Создаёт `users` (role=PATIENT) **и** пустую карту пациента через функцию Dev B (`create_patient_for_user`)
-- [ ] `POST /auth/login` — проверка пароля → `200` + `Set-Cookie: access_token` (httpOnly, SameSite=Lax, Secure на проде). Cookie с JWT, срок ~1 день
-- [ ] `POST /auth/logout` — очистка cookie
-- [ ] `GET /auth/me` — текущий пользователь и роль
-- [ ] `POST /auth/password-reset/request` и `/confirm` — токен на email (отправка письма — через простую функцию-заглушку `send_email`, SMTP потом)
-- [ ] Защита от перебора: общий ответ на неверный логин/пароль
+## Лёша — `recp_serv` (Java)
 
-### Фаза 2 — каталог и персонал
-- [ ] Модели и миграции `doctor_profiles`, `services`, `doctor_services`
-- [ ] `GET /services` (публично, только `is_active`), `GET /services/{id}/doctors` — врачи, оказывающие услугу
-- [ ] CRUD `/services` — роли RECEPTIONIST, ADMIN
-- [ ] `POST/DELETE /doctors/{id}/services/{service_id}` — привязка услуги к врачу (RECEPTIONIST, ADMIN)
-- [ ] Создание врачей и рецепционистов: `POST /staff` (ADMIN) — временно «костыль»: **seed-скрипт** `scripts/create_staff.py` + стартовые данные (услуги, пара врачей, рецепционист, админ)
+Самая важная часть: от неё зависят и фронт, и `user_serv`.
+
+### Этап 0 — каркас (первые дни)
+- [ ] Spring Boot, `Dockerfile`, порт **8000** внутри контейнера, Flyway
+- [ ] JWT-фильтр по `docs/contracts.md` → «Java: проверка токена» (Bearer **или** cookie `access_token`)
+- [ ] Ошибки в формате `{"detail", "code"}`
+- [ ] **Swagger (springdoc) с заглушками всех эндпоинтов ниже** — чтобы лид мог начать фронт, не дожидаясь логики
+
+### Этап 1 — справочники и пациенты
+- [ ] Таблицы: `patients`, `services`, `doctors` (`user_id`, ФИО, специализация, кабинет), `doctor_services`, `doctor_working_hours`
+- [ ] `GET /services` (публично), `GET /services/{id}/doctors`
+- [ ] CRUD `/services` — RECEPTIONIST, ADMIN
+- [ ] `POST /doctors`, `PUT /doctors/{id}/services`, `PUT /doctors/{id}/working-hours` — ADMIN, RECEPTIONIST
+- [ ] `POST /patients`, `GET /patients?search=` (фамилия / PESEL / телефон), `GET/PATCH /patients/{id}`, `POST /patients/{id}/verify` — RECEPTIONIST
+- [ ] Внутренние: `POST /internal/patients` (вызывает auth при регистрации, идемпотентно по `user_id`), `GET /internal/patients/by-user/{user_id}`
+
+### Этап 2 — записи (ядро)
+- [ ] Таблица `appointments` + `EXCLUDE`-ограничение от пересечений (SQL в `db_schema.md`, раздел 6)
+- [ ] `GET /appointments/slots?doctor_id=&service_id=&date=` — рабочие часы минус занятые записи, шаг 15 мин, `duration + buffer` целиком влезает в смену
+- [ ] Рецепция: `POST /appointments` (SCHEDULED, можно свою длительность/буфер), `GET /appointments?doctor_id=&date_from=&date_to=&status=`, `POST /appointments/{id}/confirm`, `POST /appointments/{id}/cancel`
+- [ ] Пациент: `GET /me/appointments`, `POST /me/appointments` (WEBSITE, PENDING, `patient_id` только из токена), `POST /me/appointments/{id}/cancel`
+- [ ] Врач: `GET /doctor/appointments?date=` — только свои
+- [ ] Внутренние для `user_serv`: `GET /internal/appointments/{id}`, `POST /internal/appointments/{id}/complete`, `GET /internal/services/{id}`
 
 ### Тесты
-- регистрация/логин/доступ по ролям, неверный пароль, дубликат email/PESEL
+- [ ] пересечение записей (в т.ч. буфер) → 409, отмена освобождает слот, запись вне смены → 409, пациент не видит/не отменяет чужие записи
 
-**Отдаёт другим:** `get_current_user`, `require_role`, модель `User`, seed-данные, `GET /services`.
-
----
-
-## Dev B — `recp_serv` (рецепция, записи, пациенты)
-
-Самый нагруженный по бизнес-логике: именно здесь живёт расписание.
-
-### Фаза 1 — пациенты
-- [ ] Модель и миграция `patients` (включая `user_id`, `is_verified`)
-- [ ] Функция `create_patient_for_user(user)` — для Dev A при регистрации
-- [ ] `POST /patients` — рецепция создаёт карту без аккаунта
-- [ ] `GET /patients?search=` — поиск по фамилии / PESEL / телефону
-- [ ] `GET/PATCH /patients/{id}`
-- [ ] `POST /patients/{id}/verify` — `is_verified = true`
-- [ ] `POST /patients/{old_id}/merge/{new_id}` — слияние: перенос записей с новой карты на старую, **перенос аллергий и хронических заболеваний без дублей** (UNIQUE по `allergen` / `name`; при конфликте оставить запись старой карты), привязка `user_id`, удаление пустой карты (в одной транзакции)
-- [ ] Поле `patients.no_known_allergies` — в модели и в `PATCH /patients/{id}`
-
-### Фаза 2 — записи (ядро)
-- [ ] Модель и миграция `appointments` + `EXCLUDE`-ограничение на пересечение (SQL из `db_schema.md`)
-- [ ] **`appointment_service.py`** — единая бизнес-логика, которую используют и рецепция, и пациент (Dev C):
-  - `get_free_slots(doctor_id, service_id, date)` — свободные окна с учётом `duration_min + buffer_min`
-  - `create_appointment(patient_id, doctor_id, service_id, start_at, source, created_by, duration_min=None, buffer_min=None)` — проверяет, что врач оказывает услугу, считает `end_at` и `blocked_until`, ловит ошибку constraint → `409 Conflict`
-  - `cancel_appointment(id, by_user)`
-- [ ] `GET /appointments/slots?doctor_id=&service_id=&date=`
-- [ ] `POST /appointments` — запись через рецепцию (`SCHEDULED`, можно задать кастомные длительность/буфер)
-- [ ] `GET /appointments?doctor_id=&date_from=&date_to=&status=` — календарь
-- [ ] `POST /appointments/{id}/confirm` — `PENDING → SCHEDULED` (онлайн-записи)
-- [ ] `POST /appointments/{id}/cancel`, `PATCH /appointments/{id}` — перенос/изменение
-- [ ] `POST /appointments/{id}/no-show`
-
-### Фаза 3 — заявки
-- [ ] `POST /appointment-requests` (публично, без аккаунта) и `GET/PATCH` для рецепции (`NEW → PROCESSED/REJECTED`, привязка созданной записи)
-
-### Позже (не MVP): manager
-- [ ] «CRUD members, manage shifts» из схемы — управление персоналом и сменами. Для MVP не делаем; расписание врача определяется календарём записей
-
-### Тесты
-- пересечение записей (в т.ч. буфер), конкурентное создание, отмена освобождает слот, кастомная длительность 268+45 мин, слияние карт (в т.ч. перенос аллергий/хронических без дублей)
-
-**Отдаёт другим:** `appointment_service` (Dev C), `create_patient_for_user` (Dev A), модели `Patient`, `Appointment`.
+### Не делаем в MVP
+слияние карт, заявки без аккаунта (`appointment_requests`), перенос записи, no-show
 
 ---
 
-## Dev C — `user_serv` (пациент, врач, админ)
+## Дев 2 — `user_serv` (Python)
 
-### Фаза 1 — врач (самое важное для работы клиники)
-- [ ] Модели и миграции `visits`, `performed_services`, `tooth_records`, `patient_allergies`, `patient_chronic_conditions`
-- [ ] `GET /doctor/appointments?date=` — мои записи на день (только свои, `doctor_id` из `current_user`)
-- [ ] `POST /visits` — создать визит по `appointment_id` (при этом `appointments.status = COMPLETED`; нельзя создать два визита на одну запись)
+Каркас уже лежит в `services/user_serv`: config, БД, Alembic, проверка JWT (`require_role`), формат ошибок, тесты с фикстурой `token()`.
+Пока у Лёши нет внутренних эндпоинтов — клиент к `recp_serv` замокать.
+
+### Этап 1 — визиты
+- [ ] Таблицы: `visits` (+ снимок записи: `appointment_id` UNIQUE, `patient_id`, `doctor_user_id`, `start_at`, `service_name`), `performed_services`
+- [ ] `POST /visits` по `appointment_id` — DOCTOR. Проверить через recp, что запись **этого врача** и в статусе `SCHEDULED`; после создания — `POST recp/internal/appointments/{id}/complete`. Второй визит на ту же запись → 409
 - [ ] `GET/PATCH /visits/{id}` — жалобы, диагноз, заключение, рекомендации (врач правит только свои)
-- [ ] `POST /visits/{id}/performed-services`, `DELETE ...` — что реально сделано (цена копируется из `services.price` в момент добавления, можно переопределить)
-- [ ] `GET /patients/{id}/history` — **хронология визитов** (от новых к старым): дата, врач, плановая услуга, жалобы, диагноз, заключение, рекомендации, выполненные услуги с зубами и ценами. Запрос — из `db_schema.md`, п. 3.3; пагинация (`limit/offset`). Доступ: DOCTOR, RECEPTIONIST
-- [ ] **Аллергические реакции:** `GET /patients/{id}/allergies`, `POST /patients/{id}/allergies`, `PATCH/DELETE /patients/{id}/allergies/{allergy_id}` (DOCTOR, RECEPTIONIST). Валидация `severity` ∈ {MILD, MODERATE, SEVERE}, дубль аллергена → `409`. `PUT /patients/{id}/no-known-allergies` — явное «аллергий нет»
-- [ ] **Хронические заболевания:** `GET/POST /patients/{id}/conditions`, `PATCH/DELETE /patients/{id}/conditions/{condition_id}` (DOCTOR, RECEPTIONIST); «снять с учёта» = `is_active=false`
-- [ ] `GET /patients/{id}/medical-card` — сводка для врача и рецепции одним запросом: данные пациента, аллергии, активные хронические заболевания, зубная карта, последние 5 визитов, флаг «аллергологический анамнез не собран»
-- [ ] В `GET /doctor/appointments` добавить для каждой записи `allergy_alert` (есть ли аллергия `SEVERE`) и `anamnesis_missing` — чтобы врач видел риск ещё до открытия карты
-- [ ] `GET /patients/{id}/teeth`, `PUT /patients/{id}/teeth/{tooth_number}` — зубная карта (номер зуба по FDI 11–48 / 51–85 — валидация)
-- [ ] «CRU info of actor» из схемы: врач может читать и править медицинскую информацию карты (`patients.notes`) — через эндпоинт, согласованный с Dev B
+- [ ] `POST /visits/{id}/performed-services`, `DELETE .../{ps_id}` — цена берётся из recp в момент добавления, можно переопределить
 
-### Фаза 2 — пациент (личный кабинет)
-- [ ] `GET/PATCH /me/profile` — свои контактные данные (телефон, email; PESEL после верификации не меняется)
-- [ ] `GET /me/appointments` — мои записи
-- [ ] `POST /me/appointments` — онлайн-запись: `patient_id` берётся **только** из аккаунта; вызывает `appointment_service.create_appointment(source=WEBSITE, status=PENDING)`, длительность/буфер из услуги
-- [ ] `POST /me/appointments/{id}/cancel` — отмена только своих и только `PENDING/SCHEDULED`
-- [ ] `GET /me/visits` — своя хронология визитов (тот же формат, что `/patients/{id}/history`), **только если `is_verified = true`**
-- [ ] `GET /me/allergies`, `GET /me/conditions` — просмотр своих аллергий и хронических заболеваний (только чтение, только при `is_verified = true`)
+### Этап 2 — медкарта
+- [ ] Таблица `patient_allergies` (UNIQUE `patient_id, allergen`, `severity` ∈ MILD/MODERATE/SEVERE)
+- [ ] `GET/POST /patients/{id}/allergies`, `DELETE /patients/{id}/allergies/{aid}` — DOCTOR, RECEPTIONIST; дубль → 409
+- [ ] `GET /patients/{id}/history` — визиты от новых к старым с выполненными услугами — DOCTOR, RECEPTIONIST
+- [ ] Пациент: `GET /me/visits`, `GET /me/allergies` — только если карта верифицирована (`GET recp/internal/patients/by-user/{user_id}`)
 
-### Фаза 3 — админ
-- [ ] `GET /admin/analytics/revenue?date_from=&date_to=` — выручка по `performed_services` (по дням, по врачам, по услугам)
-- [ ] `GET /admin/analytics/appointments` — число записей по статусам, no-show
+### Этап 3 — админ
+- [ ] `GET /admin/revenue?date_from=&date_to=` — сумма `price * quantity`, плюс разбивка по дням
 
 ### Тесты
-- врач не видит чужие записи, пациент не видит чужую карту/записи, неверифицированный пациент не видит историю/аллергии/хронические, расчёт выручки, один визит на запись
-- аллергии: дубль аллергена → 409, `SEVERE` попадает в `allergy_alert`, пациент не может править аллергии
-- история визитов: порядок от новых к старым, отменённые/будущие записи не попадают, выполненные услуги подтягиваются с ценой на момент приёма
+- [ ] врач не создаёт визит по чужой записи, второй визит → 409, пациент не видит чужое, неверифицированный не видит историю, расчёт выручки
 
-**Использует:** `require_role` (Dev A), `appointment_service` (Dev B).
+### Если останется время
+зубная карта (`tooth_records`), хронические заболевания
 
 ---
 
-## Контракты между разработчиками (договориться в первый день)
+## Даня — `auth_serv` + демо
 
-| Что | Кто пишет | Кто использует | Сигнатура |
-|---|---|---|---|
-| Авторизация | A | B, C | `Depends(get_current_user)`, `Depends(require_role("DOCTOR"))` |
-| Создание карты при регистрации | B | A | `create_patient_for_user(db, user) -> Patient` |
-| Свободные слоты | B | C, фронт | `get_free_slots(db, doctor_id, service_id, date) -> list[Slot]` |
-| Создание записи | B | C | `create_appointment(db, ...) -> Appointment` (исключения: `SlotTakenError`, `DoctorDoesNotProvideServiceError`) |
-| Отмена записи | B | C | `cancel_appointment(db, appointment_id, by_user)` |
-| Каталог услуг | A | B, C | `GET /services`, модель `Service` |
-| Модели аллергий и хронических заболеваний | C | B (для слияния карт) | `PatientAllergy`, `PatientChronicCondition` — B импортирует модели для переноса при merge |
+Сервис уже работает, задачи маленькие и ничего не блокируют.
 
-Формат ошибок единый: `{"detail": "...", "code": "SLOT_TAKEN"}`; коды статусов — `401` не авторизован, `403` нет прав, `404`, `409` конфликт слота, `422` валидация.
+- [ ] Разобраться в коде `auth_serv`, запустить тесты (`cd services/auth_serv && pytest`)
+- [ ] `POST /staff` — ADMIN создаёт пользователя с ролью DOCTOR / RECEPTIONIST (по образцу `register`) + тест
+- [ ] `POST /auth/change-password` (старый + новый пароль) + тест
+- [ ] После регистрации вызывать `POST recp/internal/patients` (когда у Лёши будет готово). **Если к этапу 2 не сделано — забирает Дев 2**
+- [ ] Postman/Bruno-коллекция всего сквозного сценария (лежит в репо, `docs/postman/`)
+- [ ] Демо-данные: 5–6 услуг с ценами, расписание врачей, 3–4 пациента — скрипт или SQL
+- [ ] ER-диаграмма для презентации
 
-## Порядок работы
+---
 
-| Этап | Dev A | Dev B | Dev C |
-|---|---|---|---|
-| 0 | Каркас, `users`, заглушка auth | Модели `patients`, `appointments`, `appointment_service` (интерфейс-заглушка) | Модели `visits`, `performed_services`, `tooth_records` |
-| 1 | Register / login / me | CRUD пациентов, слоты, запись через рецепцию | Эндпоинты врача: визит, выполненные услуги, **аллергии, хронические заболевания** |
-| 2 | Каталог, seed, сброс пароля | Подтверждение, отмена, календарь, слияние карт (с переносом аллергий/хронических) | Зубная карта, **хронология визитов, `medical-card`**, кабинет пациента, онлайн-запись |
-| 3 | Помощь с тестами, deploy | Заявки с сайта | Аналитика админа |
-| 4 | Интеграционные тесты и общий прогон сценариев: онлайн-запись → подтверждение → приём → выручка |||
+## Лид — фронт и интеграция
 
-## Definition of Done для каждого эндпоинта
-- есть проверка роли и владения данными (чужое не прочитать)
-- валидация входных данных (Pydantic)
-- миграция Alembic применяется «с нуля»
-- минимум по одному тесту на успешный и на запрещённый сценарий
+- [ ] nginx в compose: фронт + прокси `/api/auth`, `/api/recp`, `/api/user` → один адрес, cookie работает, CORS не нужен
+- [ ] Публичное: список услуг, регистрация, логин
+- [ ] Пациент: запись (услуга → врач → дата → слот), мои записи + отмена, мои визиты
+- [ ] Рецепция: календарь, список PENDING с подтверждением, поиск/создание пациента, запись пациента
+- [ ] Врач: записи на день, форма визита (жалобы, диагноз, выполненные услуги), аллергии пациента (плашка SEVERE)
+- [ ] Админ: выручка за период
+- [ ] Ревью PR, прогон сценария перед защитой
+
+---
+
+## Порядок
+
+| Этап | Лёша | Дев 2 | Даня | Лид |
+|---|---|---|---|---|
+| 0 | каркас + Swagger с заглушками | модели `visits`, `performed_services`, клиент к recp (мок) | разобраться в auth, `POST /staff` | nginx, логин/регистрация |
+| 1 | справочники, пациенты | визиты, выполненные услуги | смена пароля, вызов recp при регистрации | страницы пациента |
+| 2 | слоты, записи | аллергии, история | демо-данные, Postman | рецепция, врач |
+| 3 | тесты, багфикс | выручка, тесты | ER-диаграмма | админ, полировка |
+| 4 | общий прогон сценария, фиксы ||||
+
+## Definition of Done (для всех)
+
+- проверка роли **и** владения (чужое не прочитать и не изменить)
+- валидация входа, ошибки в формате `{"detail", "code"}`
+- миграции применяются на чистой БД
+- тест на успешный и на запрещённый сценарий
+- код через PR, не пушить напрямую в `main`
