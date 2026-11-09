@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+psycopg://clinic:clinic@localhost:5432/user_db"
+    database_url: str = "postgresql+psycopg://clinic:clinic@localhost:5432/clinic"
     # Должен совпадать с auth_serv — им проверяется подпись токена
     jwt_secret: str = "dev-secret-change-me-at-least-32-bytes!!"
     jwt_algorithm: str = "HS256"

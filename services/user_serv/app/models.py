@@ -1,6 +1,6 @@
 """Модели сервиса. Импортировать сюда все модели, чтобы их видел Alembic (alembic/env.py).
 
-FK только внутри своей БД. Ссылки на сущности других сервисов (patient_id, appointment_id,
-doctor user_id) хранятся как обычный BigInteger без ForeignKey.
+БД общая (`clinic`): ссылки на таблицы других сервисов (users, patients, appointments)
+делаем обычным ForeignKey. Писать в чужие таблицы нельзя (см. docs/contracts.md).
 """
 from app.db import Base  # noqa: F401

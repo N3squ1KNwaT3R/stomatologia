@@ -8,7 +8,6 @@ services:
     ports: ["5432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U clinic"]
       interval: 3s
@@ -18,7 +17,7 @@ services:
     build: ./services/auth_serv
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic@db:5432/auth_db
+      DATABASE_URL: postgresql+psycopg://clinic:clinic@db:5432/clinic
       RECP_URL: http://recp_serv:8000
     ports: ["8001:8000"]
     depends_on: { db: { condition: service_healthy } }
@@ -30,7 +29,7 @@ services:
     build: ./services/recp_serv
     env_file: .env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/recp_db
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/clinic
       SPRING_DATASOURCE_USERNAME: clinic
       SPRING_DATASOURCE_PASSWORD: clinic
     ports: ["8002:8000"]
@@ -40,7 +39,7 @@ services:
     build: ./services/user_serv
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic@db:5432/user_db
+      DATABASE_URL: postgresql+psycopg://clinic:clinic@db:5432/clinic
       RECP_URL: http://recp_serv:8000
     ports: ["8003:8000"]
     depends_on: { db: { condition: service_healthy } }

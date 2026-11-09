@@ -8,14 +8,24 @@
 
 | Сервис | Порт снаружи | Внутри docker-сети | БД |
 |---|---|---|---|
-| auth_serv | 8001 | http://auth_serv:8000 | auth_db |
-| recp_serv | 8002 | http://recp_serv:8000 | recp_db |
-| user_serv | 8003 | http://user_serv:8000 | user_db |
+| auth_serv | 8001 | http://auth_serv:8000 | clinic |
+| recp_serv | 8002 | http://recp_serv:8000 | clinic |
+| user_serv | 8003 | http://user_serv:8000 | clinic |
 
 Java-сервис внутри контейнера тоже слушает **8000**.
 
-Один контейнер Postgres, **у каждого сервиса своя БД**. В чужую БД не ходим, только через HTTP.
-Поэтому ссылки на чужие сущности (`user_id`, `doctor_id`) хранятся как обычный `bigint` **без FK**.
+Один контейнер Postgres и **одна БД `clinic`** на все сервисы. Таблицы делятся по владельцам (см. ниже),
+но ссылаться друг на друга можно через обычные `FOREIGN KEY` (например `doctors.user_id → users.id`,
+`visits.appointment_id → appointments.id`). БД сама гарантирует целостность и каскады
+(`ON DELETE CASCADE / RESTRICT`).
+
+Правила:
+- **Писать** в таблицы можно только своего сервиса; чужие таблицы — только FK и чтение.
+  Всё, что меняет чужие данные, идёт через `/internal/*` (см. ниже).
+- Миграции у каждого сервиса свои (Alembic: таблицы `alembic_version_auth`, `alembic_version_user`;
+  Flyway/Liquibase в recp_serv — со своей таблицей истории). Порядок применения при FK между сервисами:
+  `auth_serv` → `recp_serv` → `user_serv`. Миграция с FK на чужую таблицу должна идти после миграции,
+  которая её создаёт.
 
 ## Аутентификация (JWT)
 
@@ -25,7 +35,7 @@ Java-сервис внутри контейнера тоже слушает **80
   ```json
   {"sub": "42", "role": "DOCTOR", "iat": 1730980000, "exp": 1731066400}
   ```
-  `sub` — id из `auth_db.users`, **строкой**. `role` ∈ `PATIENT | RECEPTIONIST | DOCTOR | ADMIN`.
+  `sub` — id из `users` (auth_serv), **строкой**. `role` ∈ `PATIENT | RECEPTIONIST | DOCTOR | ADMIN`.
 - Токен принимается из cookie `access_token` (браузер) **или** из заголовка `Authorization: Bearer <token>` (Swagger, Postman, сервисы).
 - Остальные сервисы только проверяют подпись и `exp`, в `auth_serv` за пользователем не ходят.
 

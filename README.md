@@ -24,5 +24,5 @@ cd services/auth_serv && pytest          # тесты на SQLite, Postgres не
 Новая миграция (из папки сервиса, при поднятой БД):
 
 ```bash
-DATABASE_URL=postgresql+psycopg://clinic:clinic@localhost:5432/recp_db alembic revision --autogenerate -m "patients"
+DATABASE_URL=postgresql+psycopg://clinic:clinic@localhost:5432/clinic alembic revision --autogenerate -m "patients"
 ```
