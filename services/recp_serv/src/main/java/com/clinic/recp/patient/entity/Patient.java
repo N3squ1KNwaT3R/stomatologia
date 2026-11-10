@@ -2,8 +2,8 @@ package com.clinic.recp.patient.entity;
 
 import jakarta.persistence.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "patients")
@@ -30,12 +30,12 @@ public class Patient {
     private String email;
     @Column(columnDefinition = "TEXT")
     private String notes;
-    @Column(unique = true)
+    @Column(name = "user_id", unique = true)
     private Long userId;
 
     @Column(name = "is_verified", nullable = false)
-    private Boolean isVerified = false;
+    private boolean isVerified = false;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

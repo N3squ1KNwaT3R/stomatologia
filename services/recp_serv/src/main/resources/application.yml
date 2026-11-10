@@ -9,7 +9,6 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/clinic}
     username: ${SPRING_DATASOURCE_USERNAME:clinic}
     password: ${SPRING_DATASOURCE_PASSWORD:clinic}
-    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -18,8 +17,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
-
 
   flyway:
     enabled: true
