@@ -3,7 +3,9 @@ package com.clinic.recp.doctor.controller;
 import com.clinic.recp.doctor.dto.CreateDoctorRequest;
 import com.clinic.recp.doctor.dto.DoctorResponse;
 import com.clinic.recp.doctor.dto.UpdateDoctorRequest;
+import com.clinic.recp.doctor.dto.UpdateDoctorServicesRequest;
 import com.clinic.recp.doctor.service.DoctorService;
+import com.clinic.recp.service_catalog.dto.ServiceResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -53,4 +55,20 @@ public class DoctorController {
     public void delete(@PathVariable Long id) {
         doctorService.delete(id);
     }
+
+
+    @GetMapping("/{id}/services")
+    public List<ServiceResponse> findServices(@PathVariable Long id) {
+        return doctorService.findServices(id);
+    }
+
+    @PutMapping("/{id}/services")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<ServiceResponse> updateServices(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateDoctorServicesRequest request
+    ) {
+        return doctorService.updateServices(id, request.serviceIds());
+    }
+
 }

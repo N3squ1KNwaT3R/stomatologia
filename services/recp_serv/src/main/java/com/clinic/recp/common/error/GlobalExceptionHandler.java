@@ -101,6 +101,17 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleIllegalArgument(
+            IllegalArgumentException exception
+    ) {
+        return buildResponse(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                exception.getMessage(),
+                "VALIDATION_ERROR"
+        );
+    }
+
     private ResponseEntity<ApiError> buildResponse(
             HttpStatus status,
             String detail,
