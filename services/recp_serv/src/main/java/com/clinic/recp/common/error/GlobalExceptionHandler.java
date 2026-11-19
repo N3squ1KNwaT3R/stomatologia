@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -87,6 +88,17 @@ public class GlobalExceptionHandler {
                 HttpStatus.CONFLICT,
                 "Data integrity violation",
                 "DATA_INTEGRITY_VIOLATION"
+        );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(
+            AccessDeniedException exception
+    ) {
+        return buildResponse(
+                HttpStatus.FORBIDDEN,
+                "Access denied",
+                "FORBIDDEN"
         );
     }
 
