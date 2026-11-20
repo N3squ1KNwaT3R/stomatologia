@@ -215,7 +215,7 @@ public class AppointmentService {
                 : dateTo.plusDays(1).atStartOfDay(CLINIC_ZONE).toInstant();
 
         Specification<Appointment> specification = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayLiсдуфкst<>();
+            List<Predicate> predicates = new ArrayList<>();
 
             if (doctorId != null) {
                 predicates.add(cb.equal(root.get("doctor").get("id"), doctorId));
