@@ -14,6 +14,8 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
     @EntityGraph(attributePaths = "services")
     List<Doctor> findAllByOrderByIdAsc();
 
+    Optional<Doctor> findByUserId(Long userId);
+
     @Override
     @EntityGraph(attributePaths = "services")
     Optional<Doctor> findById(Long id);

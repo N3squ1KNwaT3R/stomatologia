@@ -1,5 +1,6 @@
 package com.clinic.recp.common.error;
 
+import com.clinic.recp.appointment.exception.AppointmentConflictException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -110,6 +111,17 @@ public class GlobalExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred",
                 "INTERNAL_SERVER_ERROR"
+        );
+    }
+
+    @ExceptionHandler(AppointmentConflictException.class)
+    public ResponseEntity<ApiError> handleAppointmentConflict(
+            AppointmentConflictException exception
+    ) {
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                exception.getMessage(),
+                "APPOINTMENT_CONFLICT"
         );
     }
 

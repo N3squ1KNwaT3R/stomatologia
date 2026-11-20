@@ -1,5 +1,6 @@
 package com.clinic.recp.service_catalog.service;
 
+import com.clinic.recp.service_catalog.dto.InternalServiceResponse;
 import com.clinic.recp.service_catalog.dto.ServiceRequest;
 import com.clinic.recp.service_catalog.dto.ServiceResponse;
 import com.clinic.recp.service_catalog.entity.Service;
@@ -42,6 +43,22 @@ public class ServiceCatalogService {
         applyRequest(service, request);
 
         return toResponse(service);
+    }
+
+    @Transactional(readOnly = true)
+    public InternalServiceResponse getInternalService(Long serviceId) {
+        com.clinic.recp.service_catalog.entity.Service service = serviceRepository
+                .findById(serviceId)
+                .orElseThrow(() -> new EntityNotFoundException("Service not found"));
+
+        return new InternalServiceResponse(
+                service.getId(),
+                service.getName(),
+                service.getPrice(),
+                service.getDurationMin(),
+                service.getBufferMin(),
+                service.getIsActive()
+        );
     }
 
     @Transactional
