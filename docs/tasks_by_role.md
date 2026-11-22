@@ -89,13 +89,13 @@
 
 Сервис уже работает, задачи маленькие и ничего не блокируют.
 
-- [ ] Разобраться в коде `auth_serv`, запустить тесты (`cd services/auth_serv && pytest`)
-- [ ] `POST /staff` — ADMIN создаёт пользователя с ролью DOCTOR / RECEPTIONIST (по образцу `register`) + тест
-- [ ] `POST /auth/change-password` (старый + новый пароль) + тест
-- [ ] После регистрации вызывать `POST recp/internal/patients` (когда у Лёши будет готово). **Если к этапу 2 не сделано — забирает Влад**
-- [ ] Postman/Bruno-коллекция всего сквозного сценария (лежит в репо, `docs/postman/`)
-- [ ] Демо-данные: 5–6 услуг с ценами, расписание врачей, 3–4 пациента — скрипт или SQL
-- [ ] ER-диаграмма для презентации
+- [x] Разобраться в коде `auth_serv`, запустить тесты (`cd services/auth_serv && pytest`)
+- [x] `POST /auth/staff` — ADMIN создаёт пользователя с ролью DOCTOR / RECEPTIONIST (по образцу `register`) + тест
+- [x] `POST /auth/change-password` (старый + новый пароль) + тест
+- [x] После регистрации вызывать `POST recp/internal/patients` (`app/recp_client.py`; если recp лежит — регистрация всё равно проходит, ошибка в логе)
+- [x] Postman-коллекция всего сквозного сценария: `docs/postman/clinic_mvp.postman_collection.json`
+- [x] Демо-данные: 6 услуг с ценами, 2 врача с расписанием, 4 пациента — `python -m scripts.demo_data`
+- [x] ER-диаграмма для презентации: `docs/er_diagram.md`
 
 ---
 

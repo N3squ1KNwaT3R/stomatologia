@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 PHONE_PATTERN = r"^\+?[0-9 ]{7,20}$"
@@ -14,6 +16,16 @@ class RegisterIn(BaseModel):
     @classmethod
     def _lower(cls, v: str) -> str:
         return v.lower()
+
+
+class StaffCreateIn(RegisterIn):
+    """ADMIN создаёт сотрудника. Пациенты регистрируются сами через /auth/register."""
+    role: Literal["DOCTOR", "RECEPTIONIST"]
+
+
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class LoginIn(BaseModel):
