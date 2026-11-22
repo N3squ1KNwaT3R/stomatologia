@@ -1,0 +1,1005 @@
+{
+  "info": {
+    "name": "Стоматология — сквозной сценарий MVP",
+    "description": "Регистрация → онлайн-запись (PENDING) → рецепция подтверждает → врач проводит визит → админ видит выручку.\n\nПеред запуском: `docker compose up --build`, затем `docker compose exec auth_serv python -m scripts.demo_data`.\nЗапускать папки по порядку (Collection Runner). Пароль всех демо-аккаунтов — `password123`.\n\nrecp_serv включает CSRF для POST/PUT/PATCH/DELETE: коллекция берёт cookie `XSRF-TOKEN` из ответа GET и шлёт её в заголовке `X-XSRF-TOKEN`.\nПапки 5–6 (user_serv: визиты, выручка) — по задачам из docs/tasks_by_role.md, пока сервис не готов, они падают.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "auth_url",
+      "value": "http://localhost:8001"
+    },
+    {
+      "key": "recp_url",
+      "value": "http://localhost:8002"
+    },
+    {
+      "key": "user_url",
+      "value": "http://localhost:8003"
+    },
+    {
+      "key": "password",
+      "value": "password123"
+    },
+    {
+      "key": "patient_email",
+      "value": ""
+    },
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "recp_token",
+      "value": ""
+    },
+    {
+      "key": "doctor_token",
+      "value": ""
+    },
+    {
+      "key": "patient_token",
+      "value": ""
+    },
+    {
+      "key": "xsrf_token",
+      "value": ""
+    },
+    {
+      "key": "service_id",
+      "value": ""
+    },
+    {
+      "key": "doctor_id",
+      "value": ""
+    },
+    {
+      "key": "appt_date",
+      "value": ""
+    },
+    {
+      "key": "slot_start",
+      "value": ""
+    },
+    {
+      "key": "appointment_id",
+      "value": ""
+    },
+    {
+      "key": "patient_id",
+      "value": ""
+    },
+    {
+      "key": "visit_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Персонал: логин",
+      "item": [
+        {
+          "name": "Логин админа",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@clinic.local\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('admin_token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Логин рецепции",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"recp@clinic.local\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('recp_token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Логин врача (doctor1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"doctor1@clinic.local\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('doctor_token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Админ создаёт врача (POST /auth/staff)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/staff",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{new_staff_email}}\",\n  \"password\": \"password123\",\n  \"first_name\": \"Ewa\",\n  \"last_name\": \"Lis\",\n  \"role\": \"DOCTOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('new_staff_email', `doc+${Date.now()}@clinic.local`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('role DOCTOR', () => pm.expect(pm.response.json().role).to.eql('DOCTOR'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Рецепция НЕ может создать сотрудника → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recp_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/staff",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"x@clinic.local\",\n  \"password\": \"password123\",\n  \"first_name\": \"X\",\n  \"last_name\": \"Y\",\n  \"role\": \"DOCTOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Регистрация пациента",
+      "item": [
+        {
+          "name": "Регистрация",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/register",
+            "description": "auth_serv сам создаёт пустую карту пациента в recp_serv (POST /internal/patients).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{patient_email}}\",\n  \"password\": \"{{password}}\",\n  \"first_name\": \"Adam\",\n  \"last_name\": \"Testowy\",\n  \"phone\": \"+48 600 100 200\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('patient_email', `patient+${Date.now()}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('role PATIENT', () => pm.expect(pm.response.json().role).to.eql('PATIENT'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Логин пациента",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{patient_email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('patient_token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Кто я (GET /auth/me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              }
+            ],
+            "url": "{{auth_url}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Смена пароля",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/change-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"{{password}}\",\n  \"new_password\": \"password456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Смена пароля обратно",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{auth_url}}/auth/change-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"password456\",\n  \"new_password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Каталог и слоты",
+      "item": [
+        {
+          "name": "Услуги (публично)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{recp_url}}/services"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const x = pm.cookies.get('XSRF-TOKEN'); if (x) pm.collectionVariables.set('xsrf_token', x);",
+                  "const s = pm.response.json(); pm.test('есть услуги', () => pm.expect(s.length).to.be.above(0));",
+                  "pm.collectionVariables.set('service_id', s[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Врачи",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/doctors"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const x = pm.cookies.get('XSRF-TOKEN'); if (x) pm.collectionVariables.set('xsrf_token', x);",
+                  "const sid = Number(pm.collectionVariables.get('service_id'));",
+                  "const d = pm.response.json().find(d => (d.services || []).some(s => s.id === sid));",
+                  "pm.test('есть врач на услугу', () => pm.expect(d).to.exist);",
+                  "pm.collectionVariables.set('doctor_id', d.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Свободные слоты",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/appointments/slots?doctor_id={{doctor_id}}&service_id={{service_id}}&date={{appt_date}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ближайший будний день начиная с послезавтра",
+                  "const d = new Date(); d.setDate(d.getDate() + 2);",
+                  "while ([0, 6].includes(d.getDay())) d.setDate(d.getDate() + 1);",
+                  "pm.collectionVariables.set('appt_date', d.toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const x = pm.cookies.get('XSRF-TOKEN'); if (x) pm.collectionVariables.set('xsrf_token', x);",
+                  "const slots = pm.response.json(); pm.test('есть слоты', () => pm.expect(slots.length).to.be.above(0));",
+                  "pm.collectionVariables.set('slot_start', slots[0].startAt);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Пациент записывается онлайн",
+      "item": [
+        {
+          "name": "Онлайн-запись (PENDING)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{xsrf_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{recp_url}}/me/appointments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorId\": {{doctor_id}},\n  \"serviceId\": {{service_id}},\n  \"startAt\": \"{{slot_start}}\",\n  \"comment\": \"Boli ząb\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('создано', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const a = pm.response.json();",
+                  "pm.test('PENDING', () => pm.expect(a.status).to.eql('PENDING'));",
+                  "pm.collectionVariables.set('appointment_id', a.id);",
+                  "pm.collectionVariables.set('patient_id', a.patientId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Тот же слот второй раз → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{xsrf_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{recp_url}}/me/appointments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorId\": {{doctor_id}},\n  \"serviceId\": {{service_id}},\n  \"startAt\": \"{{slot_start}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Мои записи",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/me/appointments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const x = pm.cookies.get('XSRF-TOKEN'); if (x) pm.collectionVariables.set('xsrf_token', x);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Рецепция",
+      "item": [
+        {
+          "name": "Записи PENDING",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recp_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/appointments?status=PENDING"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const x = pm.cookies.get('XSRF-TOKEN'); if (x) pm.collectionVariables.set('xsrf_token', x);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подтвердить запись → SCHEDULED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recp_token}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{xsrf_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/appointments/{{appointment_id}}/confirm"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('SCHEDULED', () => pm.expect(pm.response.json().status).to.eql('SCHEDULED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Поиск пациента",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recp_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/patients?search=Testowy"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const x = pm.cookies.get('XSRF-TOKEN'); if (x) pm.collectionVariables.set('xsrf_token', x);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Верифицировать карту пациента",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{recp_token}}"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{xsrf_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/patients/{{patient_id}}/verify"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Врач проводит визит (user_serv)",
+      "item": [
+        {
+          "name": "Записи врача на день",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctor_token}}"
+              }
+            ],
+            "url": "{{recp_url}}/doctor/appointments?date={{appt_date}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать визит по записи",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctor_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{user_url}}/visits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointment_id\": {{appointment_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('visit_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Повторный визит на ту же запись → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctor_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{user_url}}/visits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointment_id\": {{appointment_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Заполнить визит",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctor_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{user_url}}/visits/{{visit_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"complaints\": \"Ból zęba 36\",\n  \"diagnosis\": \"Próchnica\",\n  \"summary\": \"Wypełnienie\",\n  \"recommendations\": \"Kontrola za 6 miesięcy\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Выполненная услуга",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctor_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{user_url}}/visits/{{visit_id}}/performed-services",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{service_id}},\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Админ: выручка (user_serv)",
+      "item": [
+        {
+          "name": "Выручка за период",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{user_url}}/admin/revenue?date_from={{appt_date}}&date_to={{appt_date}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Пациент НЕ видит выручку → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patient_token}}"
+              }
+            ],
+            "url": "{{user_url}}/admin/revenue?date_from={{appt_date}}&date_to={{appt_date}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

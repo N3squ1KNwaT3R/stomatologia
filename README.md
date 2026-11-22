@@ -9,7 +9,11 @@
 cp .env.example .env          # поменять секреты
 docker compose up --build db auth_serv user_serv   # пока recp (Java) нет; потом просто docker compose up --build
 docker compose exec auth_serv python -m scripts.seed   # админ, рецепция, 2 врача (пароль password123)
+docker compose exec auth_serv python -m scripts.demo_data   # + услуги, расписание врачей, пациенты (нужен поднятый recp_serv)
 ```
+
+Сквозной сценарий в Postman: импортировать `docs/postman/clinic_mvp.postman_collection.json`, запустить папки по порядку.
+ER-диаграмма: `docs/er_diagram.md`.
 
 Swagger: http://localhost:8001/docs · http://localhost:8002/docs · http://localhost:8003/docs
 
